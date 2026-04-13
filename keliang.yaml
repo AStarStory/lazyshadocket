@@ -108,7 +108,7 @@ dns:
 proxy-providers:
   All:
     type: http
-    url: "https://gist.githubusercontent.com/AStarStory/3523c833b7e92e87eeda820f2555a837/raw/709dc13445a87e557b4ade21aa6a1c205c6c102e/Keliangclash"
+    url: "https://www.djjc.cfd/api/v1/client/subscribe?token=d9e1c48d570034af89f15e6f7cdc8643"
     interval: 86400
     path: ./all.yaml
     health-check:
