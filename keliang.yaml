@@ -108,7 +108,7 @@ dns:
 proxy-providers:
   All:
     type: http
-    url: "https://v1.mk/VpMP0Ni"
+    url: "https://gist.githubusercontent.com/AStarStory/3523c833b7e92e87eeda820f2555a837/raw/Keliang"
     interval: 86400
     path: ./all.yaml
     health-check:
