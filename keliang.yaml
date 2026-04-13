@@ -215,7 +215,7 @@ rules:
   - GEOIP,LAN,DIRECT
   
 # 👇 3.为你量身定制的 8.155.3.90
-  - DOMAIN-SUFFIX,lege.jishutech.cn,香港节点
+  - DOMAIN-SUFFIX,lege.jishutech.cn,DIRECT
   - IP-CIDR,8.155.3.90/32,香港节点
 
   # --- 4. 专属应用映射 ---
