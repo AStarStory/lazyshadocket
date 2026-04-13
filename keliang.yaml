@@ -215,14 +215,15 @@ rules:
   - GEOIP,LAN,DIRECT
   
   # --- 3. 🎯 你的专属独立路由 ---
-  # 精准抓取该域名，强行指定走【香港节点】策略组
-  - DOMAIN-SUFFIX,lege.jishutech.cn,手动选择
+  # 专属域名走香港
+  - DOMAIN-SUFFIX,lege.jishutech.cn,香港节点
+  # 专属 IP 走香港 (/32 代表精确匹配这一个单点 IP，no-resolve 提升匹配速度)
+  - IP-CIDR,8.155.3.90/32,手动选择,no-resolve
 
   # --- 4. 专属应用映射 ---
   - RULE-SET,AI,AI合集
 
   # --- 5. 泛域名全直连 (海外网络环境优势) ---
-  # 无论是国内网站还是普通国外网站，全部走当地物理宽带
   - GEOSITE,cn,DIRECT
   - GEOSITE,geolocation-!cn,DIRECT
   - GEOIP,CN,DIRECT
