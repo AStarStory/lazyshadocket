@@ -1,513 +1,463 @@
-# =========================================
-# 1. 核心基础参数与 Mihomo 稳定化优化
-# =========================================
-# 基础服务端口设置，保留默认以确保兼容性
+# =========================================================
+# 越南使用 - 指定后台单独回国
+#
+# 目标：
+# 1. 160.202.240.122:3333 -> 中国回国节点
+# 2. 其他所有流量 -> DIRECT
+# 3. 回国节点支持手动选择 + 自动测速
+# 4. 测速地址：
+#    http://www.gstatic.com/generate_204
+#
+# 适用：
+# Clash Verge Rev / Mihomo
+# =========================================================
+
+
+# =========================================================
+# 1. 核心基础参数
+# =========================================================
+
 port: 7897
 socks-port: 7891
 mixed-port: 7893
-# 默认关闭局域网共享，保障本地网络安全
+
 allow-lan: false
-# 运行模式：rule(规则分流)、global(全局)、direct(直连)
 mode: rule
-# 日志级别：日常使用建议 info；排障时再临时切到 debug 或 warning
 log-level: info
-# 外部控制面板监听地址
+
 external-controller: 127.0.0.1:9090
 secret: ""
 
-# --- Mihomo 内核常用增强 ---
-# 统一延迟计算，策略组（特别是 url-test 和 fallback）测速更稳定精准
 unified-delay: true
-# TCP 并发：并发尝试多个节点 IP，极大提升首次连接成功率
 tcp-concurrent: true
-# 进程匹配模式：提升 PROCESS-NAME 类规则（如向日葵、ToDesk白名单）的准确性
 find-process-mode: strict
 
 profile:
-  # 重载配置后，记忆之前手动选中的策略组节点
   store-selected: true
-  # 记忆 Fake-IP 映射表，减少重启或重载配置后的短暂断流现象
   store-fake-ip: true
 
-# --- Geo 数据库自动更新策略 ---
-geodata-mode: true
-# 内存控制机制：常规设备建议 standard；如果是极低内存设备（如早期软路由）可改 memconservative
-geodata-loader: standard
-geo-auto-update: true
-# Geo 数据库每 24 小时自动更新一次，确保地区与应用判定准确
-geo-update-interval: 24
-geox-url:
-  geoip: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/release/geoip.dat"
-  geosite: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/release/geosite.dat"
-  asn: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/release/GeoLite2-ASN.mmdb"
-  mmdb: "https://github.com/Hackl0us/GeoIP2-CN/releases/latest/download/Country.mmdb"
 
-# =========================================
-# 2. 高级网络接管 (TUN 虚拟网卡与嗅探)
-# =========================================
+# =========================================================
+# 2. TUN
+#
+# 默认关闭。
+# 如果后面你希望 Clash Verge 接管所有程序流量，
+# 可以在客户端中开启 TUN。
+# =========================================================
+
 tun:
-  # TUN 模式总开关：是否实际生效仍以 Clash Verge Rev 面板 UI 的开关状态为准
   enable: false
-  # 网络栈：桌面端通用性较好，优先推荐 mixed
   stack: mixed
-  # 开启 TUN 时劫持系统 DNS，防止 DNS 泄漏，请求统一交给 Mihomo 处理
-  dns-hijack:
-    - any:53
-    - tcp://any:53
   auto-route: true
-  # 自动重定向：Linux 支持更完整；Windows 视内核能力生效
-  auto-redirect: true
   auto-detect-interface: true
-  # GSO 优化：偏向底层性能提升；如遇某些老旧软件兼容性问题可关闭
-  gso: true
-  gso-max-size: 65536
 
-# --- 流量嗅探 (Sniffer) ---
-# 核心作用：修正部分 App (如流媒体) 写死底层 IP 导致的分流失效，强行还原域名
+
+# =========================================================
+# 3. 流量嗅探
+# =========================================================
+
 sniffer:
   enable: true
-  force-dns-mapping: true
   parse-pure-ip: true
-  override-destination: true
-  sniff:
-    TLS:
-      ports: [443, 8443]
-    HTTP:
-      ports: [80, '8080-8880']
-    QUIC:
-      ports: [443, 8443]
-  force-domain:
-    # 强制嗅探列表：覆盖谷歌、油管、脸书系的核心底层通讯
-    - '+.google.com'
-    - '+.googleapis.com'
-    - '+.googleusercontent.com'
-    - '+.youtube.com'
-    - '+.facebook.com'
-    - '+.messenger.com'
-    - '+.fbcdn.net'
-    - 'fbcdn-a.akamaihd.net'
-  skip-domain:
-    # 嗅探白名单：智能家居等局域网设备建议跳过，避免通讯异常
-    - 'Mijia Cloud'
-    - '+.push.apple.com'   # 防止苹果推送消息被嗅探误杀，确保通知秒到
 
-# =========================================
-# 3. DNS 防污染与极速解析体系
-# =========================================
+  sniff:
+    HTTP:
+      ports:
+        - 80
+        - 8080-8880
+
+    TLS:
+      ports:
+        - 443
+        - 8443
+
+    QUIC:
+      ports:
+        - 443
+
+
+# =========================================================
+# 4. DNS
+#
+# 由于你的目标后台直接使用 IP：
+# 160.202.240.122
+#
+# 所以访问这个后台本身不依赖 DNS。
+# DNS 主要用于其他正常直连网站。
+# =========================================================
+
 dns:
   enable: true
   listen: 127.0.0.1:1053
+
   ipv6: false
-  # 增强模式：推荐 fake-ip，极速响应 DNS 请求，是网页秒开的核心
+
   enhanced-mode: fake-ip
   fake-ip-range: 198.18.0.1/16
-  use-hosts: true
+
   use-system-hosts: true
-  # 尊重分流规则：DNS 解析结果跟随分流策略，从根本上减少 DNS 泄漏风险
   respect-rules: true
-  prefer-h3: false
-  # 缓存算法：arc 能在缓存命中率与内存占用之间取得较好平衡
-  cache-algorithm: arc
 
-  # --- 引导 DNS ---
-  # 仅用于解析下方 DoH/DoT 域名的真实 IP，稳定优先，首选国内高可用 DNS
   default-nameserver:
-    - 223.5.5.5
-    - 119.29.29.29
+    - 1.1.1.1
+    - 8.8.8.8
 
-  # --- 主解析器 ---
-  # 常规域名优先使用国内 DoH 加密解析，提高国内访问速度与稳定性
   nameserver:
-    - https://223.5.5.5/dns-query
-    - https://doh.pub/dns-query
-    - https://dns.alidns.com/dns-query
+    - https://cloudflare-dns.com/dns-query
+    - https://dns.google/dns-query
 
-  # --- 代理专用解析器 ---
-  # 专用于解析代理节点域名，混合国内与海外 Google 解析器以提升全局兼容性
   proxy-server-nameserver:
-    - https://223.5.5.5/dns-query
-    - https://doh.pub/dns-query
-    - https://dns.google/dns-query
-
-  # --- 直连解析器 ---
-  # 指定直接连接流量使用的 DNS
-  direct-nameserver:
-    - https://223.5.5.5/dns-query
+    - https://dns.alidns.com/dns-query
     - https://doh.pub/dns-query
 
-  # --- 兜底回退解析器 ---
-  # 主要用于国外被污染域名，或主解析器异常时的紧急兜底
-  fallback:
-    - tls://1.1.1.1:853
-    - tls://8.8.8.8:853
-    - tls://9.9.9.9:853
-    - https://dns.google/dns-query
-
-  # --- 域名分流解析策略 (nameserver-policy) ---
-  # 按域名类别指定解析路径，实现国内外 DNS 完全物理隔离，避免混用污染
-  nameserver-policy:
-    "geosite:private,cn,apple,apple-cn,microsoft@cn,onedrive,steam@cn,category-games@cn":
-      - https://doh.pub/dns-query
-      - https://223.5.5.5/dns-query
-    "geosite:geolocation-!cn":
-      - tls://1.1.1.1:853
-      - tls://8.8.8.8:853
-
-  # --- Rule 模式 Fake-IP 过滤名单 (防断流核心) ---
-  # 原则：局域网通讯、国内常用检测站点、时间同步服务等，必须强行返回真实 IP
-  fake-ip-filter-mode: rule
   fake-ip-filter:
-    - GEOSITE,private,real-ip
-    - GEOSITE,cn,real-ip
-    - DOMAIN,localhost.ptlogin2.qq.com,real-ip
-    - DOMAIN,localhost.sec.qq.com,real-ip
-    - DOMAIN,localhost.work.weixin.qq.com,real-ip
-    - DOMAIN-SUFFIX,msftconnecttest.com,real-ip
-    - DOMAIN-SUFFIX,msftncsi.com,real-ip
-    - DOMAIN,detectportal.firefox.com,real-ip
-    - DOMAIN,captive.apple.com,real-ip
-    - DOMAIN,pool.ntp.org,real-ip
-    - DOMAIN,time.windows.com,real-ip
-    - DOMAIN,resolver1.opendns.com,real-ip
-    - DOMAIN-WILDCARD,time.*.com,real-ip
-    - DOMAIN-WILDCARD,time.*.gov,real-ip
-    - DOMAIN-WILDCARD,ntp.*.com,real-ip
-    - DOMAIN-WILDCARD,*.ntp.org.cn,real-ip
-    - MATCH,fake-ip
+    - "*.lan"
+    - "+.local"
+    - "localhost"
+    - "+.msftconnecttest.com"
+    - "+.msftncsi.com"
+    - "captive.apple.com"
 
-# =========================================
-# 4. 节点提供者 (远程订阅接入)
-# =========================================
-# 统一管理和更新您的 Sub-Store 私密订阅或机场链接
-proxy-providers:
-  All:
-    type: http
-    url: "https://gist.githubusercontent.com/AStarStory/3523c833b7e92e87eeda820f2555a837/raw/Keliang"
-    interval: 86400
-    path: ./all.yaml
-    health-check:
-      enable: true
-      interval: 600
-      url: "https://www.gstatic.com/generate_204"
 
-# =========================================
-# 5. 策略组编排 (UI 面板显示的分组与权重)
-# =========================================
+# =========================================================
+# 5. 回国节点
+#
+# 从原机场配置中提取：
+# 绍兴 / 北京 / 上海 / 深圳
+#
+# 每个地区：
+# 1. 直连
+# 2. 南亚中转
+# 3. 东亚中转
+# 4. 香港中转
+# =========================================================
+
+proxies:
+
+  # =======================================================
+  # 绍兴
+  # =======================================================
+
+  - name: "🇨🇳 绍兴"
+    type: vmess
+    server: shaoxing.ednovas.life
+    port: 22222
+    uuid: 1d22fcc5-89e8-465f-a84b-32cbce62a258
+    alterId: 0
+    cipher: auto
+    udp: true
+
+  - name: "🇨🇳 绍兴-南亚中转"
+    type: vmess
+    server: sg.nmsl.sb
+    port: 16218
+    uuid: 1d22fcc5-89e8-465f-a84b-32cbce62a258
+    alterId: 0
+    cipher: auto
+    udp: true
+
+  - name: "🇨🇳 绍兴-东亚中转"
+    type: vmess
+    server: jp.nmsl.sb
+    port: 16218
+    uuid: 1d22fcc5-89e8-465f-a84b-32cbce62a258
+    alterId: 0
+    cipher: auto
+    udp: true
+
+  - name: "🇨🇳 绍兴-香港中转"
+    type: vmess
+    server: bbc.ednovas.cloud
+    port: 16218
+    uuid: 1d22fcc5-89e8-465f-a84b-32cbce62a258
+    alterId: 0
+    cipher: auto
+    udp: true
+
+
+  # =======================================================
+  # 北京
+  # =======================================================
+
+  - name: "🇨🇳 北京"
+    type: vmess
+    server: beijing.ednovas.life
+    port: 22222
+    uuid: 1d22fcc5-89e8-465f-a84b-32cbce62a258
+    alterId: 0
+    cipher: auto
+    udp: true
+
+  - name: "🇨🇳 北京-南亚中转"
+    type: vmess
+    server: sg.nmsl.sb
+    port: 64551
+    uuid: 1d22fcc5-89e8-465f-a84b-32cbce62a258
+    alterId: 0
+    cipher: auto
+    udp: true
+
+  - name: "🇨🇳 北京-东亚中转"
+    type: vmess
+    server: jp.nmsl.sb
+    port: 64551
+    uuid: 1d22fcc5-89e8-465f-a84b-32cbce62a258
+    alterId: 0
+    cipher: auto
+    udp: true
+
+  - name: "🇨🇳 北京-香港中转"
+    type: vmess
+    server: bbc.ednovas.cloud
+    port: 64551
+    uuid: 1d22fcc5-89e8-465f-a84b-32cbce62a258
+    alterId: 0
+    cipher: auto
+    udp: true
+
+
+  # =======================================================
+  # 上海
+  # =======================================================
+
+  - name: "🇨🇳 上海"
+    type: vmess
+    server: shanghai.ednovas.life
+    port: 22222
+    uuid: 1d22fcc5-89e8-465f-a84b-32cbce62a258
+    alterId: 0
+    cipher: auto
+    udp: true
+
+  - name: "🇨🇳 上海-南亚中转"
+    type: vmess
+    server: sg.nmsl.sb
+    port: 56099
+    uuid: 1d22fcc5-89e8-465f-a84b-32cbce62a258
+    alterId: 0
+    cipher: auto
+    udp: true
+
+  - name: "🇨🇳 上海-东亚中转"
+    type: vmess
+    server: jp.nmsl.sb
+    port: 56099
+    uuid: 1d22fcc5-89e8-465f-a84b-32cbce62a258
+    alterId: 0
+    cipher: auto
+    udp: true
+
+  - name: "🇨🇳 上海-香港中转"
+    type: vmess
+    server: bbc.ednovas.cloud
+    port: 56099
+    uuid: 1d22fcc5-89e8-465f-a84b-32cbce62a258
+    alterId: 0
+    cipher: auto
+    udp: true
+
+
+  # =======================================================
+  # 深圳
+  # =======================================================
+
+  - name: "🇨🇳 深圳"
+    type: vmess
+    server: shenzhen.ednovas.life
+    port: 22222
+    uuid: 1d22fcc5-89e8-465f-a84b-32cbce62a258
+    alterId: 0
+    cipher: auto
+    udp: true
+
+  - name: "🇨🇳 深圳-南亚中转"
+    type: vmess
+    server: sg.nmsl.sb
+    port: 56100
+    uuid: 1d22fcc5-89e8-465f-a84b-32cbce62a258
+    alterId: 0
+    cipher: auto
+    udp: true
+
+  - name: "🇨🇳 深圳-东亚中转"
+    type: vmess
+    server: jp.nmsl.sb
+    port: 56100
+    uuid: 1d22fcc5-89e8-465f-a84b-32cbce62a258
+    alterId: 0
+    cipher: auto
+    udp: true
+
+  - name: "🇨🇳 深圳-香港中转"
+    type: vmess
+    server: bbc.ednovas.cloud
+    port: 56100
+    uuid: 1d22fcc5-89e8-465f-a84b-32cbce62a258
+    alterId: 0
+    cipher: auto
+    udp: true
+
+
+# =========================================================
+# 6. 策略组
+# =========================================================
+
 proxy-groups:
-  # --- 基础控制枢纽 ---
-  - name: 节点选择
-    type: select
-    icon: https://fastly.jsdelivr.net/gh/clash-verge-rev/clash-verge-rev.github.io@main/docs/assets/icons/adjust.svg
-    use: [All]
-    proxies: [自动选择, 故障转移, 负载均衡(散列), 负载均衡(轮询), 香港节点, 日本节点, 美国节点, 台湾节点, 新加坡节点, 韩国节点]
 
-  - name: 手动选择
-    type: select
-    icon: https://www.clashverge.dev/assets/icons/link.svg
-    use: [All]
-    # 显式补全 proxies 以绕过 GUI 严格校验
-    proxies: []
+  # =======================================================
+  # 主回国策略
+  #
+  # 平时直接在 Clash Verge 中选择这里。
+  #
+  # 默认：
+  # ⚡ 回国自动选择
+  #
+  # 也可以手动选择深圳 / 上海 / 北京 / 绍兴。
+  # =======================================================
 
-  # --- 自动化测速与高可用组 ---
-  - name: 自动选择
+  - name: "🇨🇳 回国节点"
+    type: select
+    proxies:
+      - "⚡ 回国自动选择"
+      - "🛟 回国故障转移"
+
+      - "🇨🇳 深圳-香港中转"
+      - "🇨🇳 深圳-南亚中转"
+      - "🇨🇳 深圳-东亚中转"
+      - "🇨🇳 深圳"
+
+      - "🇨🇳 上海-香港中转"
+      - "🇨🇳 上海-南亚中转"
+      - "🇨🇳 上海-东亚中转"
+      - "🇨🇳 上海"
+
+      - "🇨🇳 绍兴-香港中转"
+      - "🇨🇳 绍兴-南亚中转"
+      - "🇨🇳 绍兴-东亚中转"
+      - "🇨🇳 绍兴"
+
+      - "🇨🇳 北京-香港中转"
+      - "🇨🇳 北京-南亚中转"
+      - "🇨🇳 北京-东亚中转"
+      - "🇨🇳 北京"
+
+
+  # =======================================================
+  # 自动测速
+  #
+  # 每 5 分钟测速一次。
+  # tolerance 50 = 延迟差距不足 50ms 时不频繁切换。
+  # =======================================================
+
+  - name: "⚡ 回国自动选择"
     type: url-test
-    icon: https://fastly.jsdelivr.net/gh/clash-verge-rev/clash-verge-rev.github.io@main/docs/assets/icons/speed.svg
-    use: [All]
-    proxies: []
-    url: "https://www.gstatic.com/generate_204"
+
+    proxies:
+      - "🇨🇳 深圳-香港中转"
+      - "🇨🇳 深圳-南亚中转"
+      - "🇨🇳 深圳-东亚中转"
+      - "🇨🇳 深圳"
+
+      - "🇨🇳 上海-香港中转"
+      - "🇨🇳 上海-南亚中转"
+      - "🇨🇳 上海-东亚中转"
+      - "🇨🇳 上海"
+
+      - "🇨🇳 绍兴-香港中转"
+      - "🇨🇳 绍兴-南亚中转"
+      - "🇨🇳 绍兴-东亚中转"
+      - "🇨🇳 绍兴"
+
+      - "🇨🇳 北京-香港中转"
+      - "🇨🇳 北京-南亚中转"
+      - "🇨🇳 北京-东亚中转"
+      - "🇨🇳 北京"
+
+    url: "http://www.gstatic.com/generate_204"
     interval: 300
     tolerance: 50
+    lazy: true
 
-  - name: 故障转移
+
+  # =======================================================
+  # 故障转移
+  #
+  # 当前节点不可用时自动切换。
+  # =======================================================
+
+  - name: "🛟 回国故障转移"
     type: fallback
-    icon: https://fastly.jsdelivr.net/gh/clash-verge-rev/clash-verge-rev.github.io@main/docs/assets/icons/ambulance.svg
-    use: [All]
-    proxies: []
-    url: "https://www.gstatic.com/generate_204"
+
+    proxies:
+      - "🇨🇳 深圳-香港中转"
+      - "🇨🇳 深圳-南亚中转"
+      - "🇨🇳 深圳"
+      - "🇨🇳 上海-香港中转"
+      - "🇨🇳 上海-南亚中转"
+      - "🇨🇳 上海"
+      - "🇨🇳 绍兴-香港中转"
+      - "🇨🇳 绍兴"
+      - "🇨🇳 北京-香港中转"
+      - "🇨🇳 北京"
+
+    url: "http://www.gstatic.com/generate_204"
     interval: 300
+    lazy: true
 
-  - name: 负载均衡(散列)
-    type: load-balance
-    strategy: consistent-hashing
-    icon: https://fastly.jsdelivr.net/gh/clash-verge-rev/clash-verge-rev.github.io@main/docs/assets/icons/merry_go.svg
-    use: [All]
-    proxies: []
-    url: "https://www.gstatic.com/generate_204"
-    interval: 300
 
-  - name: 负载均衡(轮询)
-    type: load-balance
-    strategy: round-robin
-    icon: https://fastly.jsdelivr.net/gh/clash-verge-rev/clash-verge-rev.github.io@main/docs/assets/icons/balance.svg
-    use: [All]
-    proxies: []
-    url: "https://www.gstatic.com/generate_204"
-    interval: 300
+# =========================================================
+# 7. 路由规则
+# =========================================================
 
-  # --- 场景化与业务逻辑分组 ---
-  - name: 国外网站
-    type: select
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Global.png
-    # 定义 &G 母版，统一包含常用控制组件
-    proxies: &G [节点选择, 手动选择, 自动选择, 故障转移, 负载均衡(散列), 负载均衡(轮询), 香港节点, 日本节点, 美国节点, 台湾节点, 新加坡节点, 韩国节点]
-
-  - name: 国内网站
-    type: select
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/China_Map.png
-    # 定义 &C 母版，优先保证直连，节点选择备用
-    proxies: &C [DIRECT, 节点选择, 自动选择, 香港节点, 台湾节点, 新加坡节点]
-
-  # 👇 大部分常规服务继承 *G 母版逻辑
-  - name: AI合集
-    type: select
-    icon: https://raw.githubusercontent.com/Koolson/Qure/63be653774a6a83cd8e475a7b65f1ed68b9a0093/IconSet/Color/AI.png
-    proxies: *G
-    
-  # 👇 OpenAI 严格审计港区 IP，打乱默认排序，首选非港区节点
-  - name: OpenAI
-    type: select
-    icon: https://raw.githubusercontent.com/chxm1023/Script_X/main/icon/ChatGPT/ChatGPT5.png
-    proxies: [美国节点, 日本节点, 新加坡节点, 台湾节点, 手动选择, 节点选择]
-    
-  - name: Telegram
-    type: select
-    icon: https://fastly.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Telegram.png
-    proxies: *G
-    
-  - name: Github
-    type: select
-    icon: https://raw.githubusercontent.com/fmz200/wool_scripts/main/icons/apps/github_07.png
-    proxies: *G
-    
-  # 👇 TikTok 强封锁环境，默认优先排挤香港，首选新、美、日
-  - name: TikTok
-    type: select
-    icon: https://www.clashverge.dev/assets/icons/tiktok.svg
-    proxies: [新加坡节点, 美国节点, 日本节点, 台湾节点, 韩国节点, 手动选择, 节点选择]
-    
-  - name: YouTube
-    type: select
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/YouTube.png
-    proxies: *G
-    
-  - name: NETFLIX
-    type: select
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Netflix.png
-    proxies: *G
-    
-  # 👇 迪士尼流媒体解锁专线配置，强制默认首选新加坡/美国高解锁区
-  - name: Disney+
-    type: select
-    icon: https://raw.githubusercontent.com/Orz-3/mini/master/Color/DisneyPlus.png
-    proxies: [新加坡节点, 香港节点, 美国节点, 台湾节点, 日本节点, 韩国节点, 手动选择, 节点选择]
-
-  - name: Emby
-    type: select
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Emby.png
-    proxies: *G
-    
-  - name: 谷歌服务
-    type: select
-    icon: https://www.clashverge.dev/assets/icons/google.svg
-    proxies: *G
-    
-  - name: 苹果服务
-    type: select
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Apple.png
-    proxies: *C
-    
-  - name: 微软服务
-    type: select
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Microsoft.png
-    proxies: *C
-    
-  - name: 游戏平台
-    type: select
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Game.png
-    proxies: *G
-    
-  - name: 漏网之鱼
-    type: select
-    icon: https://fastly.jsdelivr.net/gh/clash-verge-rev/clash-verge-rev.github.io@main/docs/assets/icons/fish.svg
-    proxies: *G
-
-  # --- 地区节点正则表达式过滤组 ---
-  # 通过 filter 自动从 All 中捞取对应国家/地区的节点，实现免手动维护
-  - name: 香港节点
-    type: url-test
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Hong_Kong.png
-    use: [All]
-    proxies: []
-    filter: 港|🇭🇰|HK|(?i)Hong
-    url: "https://www.gstatic.com/generate_204"
-    interval: 300
-  - name: 日本节点
-    type: url-test
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Japan.png
-    use: [All]
-    proxies: []
-    filter: 日|东京|🇯🇵|JP|(?i)Japan
-    url: "https://www.gstatic.com/generate_204"
-    interval: 300
-  - name: 台湾节点
-    type: url-test
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Taiwan.png
-    use: [All]
-    proxies: []
-    filter: 台|🇹🇼|TW|(?i)Taiwan
-    url: "https://www.gstatic.com/generate_204"
-    interval: 300
-  - name: 美国节点
-    type: url-test
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/United_States.png
-    use: [All]
-    proxies: []
-    filter: 美|洛杉矶|🇺🇸|US|(?i)States|American
-    url: "https://www.gstatic.com/generate_204"
-    interval: 300
-  - name: 新加坡节点
-    type: url-test
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Singapore.png
-    use: [All]
-    proxies: []
-    filter: 新加坡|🇸🇬|SG|(?i)Singapore
-    url: "https://www.gstatic.com/generate_204"
-    interval: 300
-  - name: 韩国节点
-    type: url-test
-    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Korea.png
-    use: [All]
-    proxies: []
-    filter: 韩国|首尔|🇰🇷|KR|(?i)Korea
-    url: "https://www.gstatic.com/generate_204"
-    interval: 300
-
-# =========================================
-# 6. 第三方规则集引用 (Rule Providers)
-# =========================================
-# 定义锚点：使用原汁原味 .list 格式，统一行为类型(classical)与格式(text)
-rule-anchor:
-  txt-domain: &txt-domain {type: http, behavior: classical, format: text, interval: 86400}
-
-rule-providers:
-  AI:
-    <<: *txt-domain
-    url: "https://raw.githubusercontent.com/viewer12/OverseasAI.list/refs/heads/main/rule/Clash/OverseasAI/OverseasAI.list"
-    path: ./ruleset/AI.txt
-  OpenAI:
-    <<: *txt-domain
-    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/OpenAI/OpenAI.list"
-    path: ./ruleset/OpenAI.txt
-  Github:
-    <<: *txt-domain
-    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/GitHub/GitHub.list"
-    path: ./ruleset/Github.txt
-  TikTok:
-    <<: *txt-domain
-    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/refs/heads/master/rule/Clash/TikTok/TikTok.list"
-    path: ./ruleset/TikTok.txt
-  Telegram:
-    <<: *txt-domain
-    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Telegram/Telegram.list"
-    path: ./ruleset/Telegram.txt
-  YouTube:
-    <<: *txt-domain
-    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/YouTube/YouTube.list"
-    path: ./ruleset/YouTube.txt
-  Netflix:
-    <<: *txt-domain
-    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Netflix/Netflix.list"
-    path: ./ruleset/Netflix.txt
-  Disney:
-    <<: *txt-domain
-    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Disney/Disney.list"
-    path: ./ruleset/Disney.txt
-  Apple:
-    <<: *txt-domain
-    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Apple/Apple.list"
-    path: ./ruleset/Apple.txt
-  Microsoft:
-    <<: *txt-domain
-    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Microsoft/Microsoft.list"
-    path: ./ruleset/Microsoft.txt
-  Google:
-    <<: *txt-domain
-    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Google/Google.list"
-    path: ./ruleset/Google.txt
-  Game:
-    <<: *txt-domain
-    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Game/Game.list"
-    path: ./ruleset/Game.txt
-
-# =========================================
-# 7. 终极路由与分流规则 (由上至下严格匹配)
-# =========================================
 rules:
-  # --- 0. 个人绝对直连白名单 ---
-  # 工作核心资产与敏感金融服务，强制走本地物理宽带防止被杀或封号
-  - DOMAIN-SUFFIX,modao.cc,DIRECT
-  - DOMAIN-KEYWORD,bank,DIRECT
-  - DOMAIN-SUFFIX,alipay.com,DIRECT
 
-  # --- 1. 进程级防卡顿白名单 ---
-  # 彻底解决开启 TUN 后，远程控制、内网穿透、语音会议软件掉线或卡顿问题
-  - PROCESS-NAME,SunloginClient.exe,DIRECT
-  - PROCESS-NAME,ToDesk.exe,DIRECT
-  - PROCESS-NAME,TeamViewer.exe,DIRECT
-  - PROCESS-NAME,wemeetapp.exe,DIRECT
-  - PROCESS-NAME,tailscaled.exe,DIRECT
-  - PROCESS-NAME,zerotier-one.exe,DIRECT
+  # =======================================================
+  # 局域网直连
+  # =======================================================
 
-  # --- 2. 🎯 你的专属独立服务器路由 ---
-  # 确保你设计的 EAM 系统和阿里云控制台环境稳定连接，强制回流香港专线
-  - DOMAIN-SUFFIX,lege.freeddns.org,香港节点
-  - DOMAIN-SUFFIX,lege.jishutech.cn,香港节点
-  - DOMAIN-SUFFIX,ecs.console.aliyun.com,香港节点
-  - IP-CIDR,8.155.3.90/32,香港节点,no-resolve
-
-  # --- 2.5 流媒体强绑防漏网补丁 (专治迪士尼锁区) ---
-  # 强行拦截迪士尼极易漏网的登录验证底层 API，确保分配至正确的解锁大区
-  - DOMAIN-KEYWORD,disney,Disney+
-  - DOMAIN-KEYWORD,bamgrid,Disney+
-  - DOMAIN-SUFFIX,dssott.com,Disney+
-  - DOMAIN-SUFFIX,disneystreaming.com,Disney+
-  - DOMAIN-SUFFIX,starott.com,Disney+
-  - DOMAIN-SUFFIX,star.biz,Disney+
-
-  # --- 3. 节点与规则库自身更新流量 ---
-  # 防止无法拉取最新规则或订阅
-  - DOMAIN-SUFFIX,gist.githubusercontent.com,Github
-  - DOMAIN-SUFFIX,raw.githubusercontent.com,Github
-
-  # --- 4. 局域网与内网优先直连 ---
-  # 访问打印机、NAS 等本地设备，绕过代理内核处理，降低开销
   - GEOSITE,private,DIRECT
   - GEOIP,LAN,DIRECT
 
-  # --- 5. 专属应用精确分流 ---
-  # 业务流量进入各自的策略组，由面板决定具体走向
-  - RULE-SET,AI,AI合集
-  - RULE-SET,OpenAI,OpenAI
-  - RULE-SET,Github,Github
-  - RULE-SET,TikTok,TikTok
-  - RULE-SET,Telegram,Telegram
-  - RULE-SET,YouTube,YouTube
-  - RULE-SET,Netflix,NETFLIX
-  - RULE-SET,Disney,Disney+
-  # --- Emby 私有线路精确分流 ---
-  - DOMAIN,media.micu.hk,Emby
-  - DOMAIN,tv.micu.hk,DIRECT
-  - RULE-SET,Apple,苹果服务
-  - RULE-SET,Microsoft,微软服务
-  - RULE-SET,Google,谷歌服务
-  - RULE-SET,Game,游戏平台
 
-  # --- 6. 泛域名与 Geo 数据兜底分流 ---
-  # 处理上述规则未覆盖的剩余流量，利用大数据库实现国内直连、海外代理
-  - GEOSITE,geolocation-!cn,国外网站
-  - GEOSITE,cn,国内网站
-  - GEOIP,CN,国内网站
+  # =======================================================
+  # 唯一需要翻回中国的地址
+  #
+  # 原地址：
+  #
+  # http://160.202.240.122:3333/#/login
+  #
+  # Clash 实际只需要识别：
+  #
+  # IP：
+  # 160.202.240.122
+  #
+  # 端口：
+  # 3333
+  #
+  # #/login 属于浏览器 Hash Router，
+  # 不参与网络路由匹配。
+  # =======================================================
 
-  # --- 7. 终极兜底 ---
-  # 无法匹配任何已知规则的流量，进入漏网之鱼池子进行最后裁定
-  - MATCH,漏网之鱼
+  - AND,((IP-CIDR,160.202.240.122/32),(DST-PORT,3333)),🇨🇳 回国节点
+
+
+  # =======================================================
+  # 最终兜底
+  #
+  # 除上述 IP:3333 外：
+  #
+  # Google
+  # ChatGPT
+  # YouTube
+  # Facebook
+  # Zalo
+  # Microsoft
+  # Apple
+  # 越南网站
+  # 中国网站
+  # 国际网站
+  #
+  # 全部使用越南本地网络。
+  # =======================================================
+
+  - MATCH,DIRECT
