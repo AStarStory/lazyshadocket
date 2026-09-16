@@ -1,20 +1,26 @@
 # =========================================================
-# 越南使用 - 指定后台单独回国
-#
-# 目标：
-# 1. 160.202.240.122:3333 -> 中国回国节点
-# 2. 其他所有流量 -> DIRECT
-# 3. 回国节点支持手动选择 + 自动测速
-# 4. 测速地址：
-#    http://www.gstatic.com/generate_204
-#
-# 适用：
 # Clash Verge Rev / Mihomo
+# 越南 -> 中国 回国专用配置
+#
+# 使用场景：
+# 1. Windows + Clash Verge Rev
+# 2. 开启 TUN 模式
+# 3. 全局模式时：整个电脑翻回中国
+# 4. 规则模式时：仅 160.202.240.122:3333 回国
+# 5. 针对摄像头 / IoT / 国内监控平台优化
+#
+# DNS：
+# - 阿里 DNS
+# - 腾讯 DNSPod
+#
+# DNS 模式：
+# - redir-host
+#   避免部分摄像头、IoT、WebRTC、P2P 与 Fake-IP 不兼容
 # =========================================================
 
 
 # =========================================================
-# 1. 核心基础参数
+# 1. 基础参数
 # =========================================================
 
 port: 7897
@@ -22,7 +28,11 @@ socks-port: 7891
 mixed-port: 7893
 
 allow-lan: false
+
+# 配置文件默认采用规则模式
+# 如果 Clash Verge 界面切换为“全局”，GUI 会使用 GLOBAL
 mode: rule
+
 log-level: info
 
 external-controller: 127.0.0.1:9090
@@ -30,26 +40,33 @@ secret: ""
 
 unified-delay: true
 tcp-concurrent: true
+
 find-process-mode: strict
 
 profile:
   store-selected: true
-  store-fake-ip: true
 
 
 # =========================================================
 # 2. TUN
-#
-# 默认关闭。
-# 如果后面你希望 Clash Verge 接管所有程序流量，
-# 可以在客户端中开启 TUN。
 # =========================================================
 
 tun:
-  enable: false
+  enable: true
+
+  # Windows 推荐 mixed
   stack: mixed
+
   auto-route: true
   auto-detect-interface: true
+
+  # 防止部分流量绕过 TUN
+  strict-route: true
+
+  # 强制程序 DNS 请求交给 Mihomo
+  dns-hijack:
+    - any:53
+    - tcp://any:53
 
 
 # =========================================================
@@ -58,7 +75,12 @@ tun:
 
 sniffer:
   enable: true
+
+  # 对纯 IP 流量尝试识别域名
   parse-pure-ip: true
+
+  # 使用识别出来的域名覆盖目标
+  override-destination: false
 
   sniff:
     HTTP:
@@ -79,60 +101,76 @@ sniffer:
 # =========================================================
 # 4. DNS
 #
-# 由于你的目标后台直接使用 IP：
-# 160.202.240.122
+# 摄像头兼容重点：
 #
-# 所以访问这个后台本身不依赖 DNS。
-# DNS 主要用于其他正常直连网站。
+# 不使用：
+#   fake-ip
+#
+# 改成：
+#   redir-host
+#
+# 这样访问摄像头、P2P、IoT、国内设备平台时
+# 一般比 Fake-IP 兼容性更好。
 # =========================================================
 
 dns:
   enable: true
+
   listen: 127.0.0.1:1053
 
   ipv6: false
 
-  enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
+  enhanced-mode: redir-host
 
   use-system-hosts: true
+
   respect-rules: true
 
+
+  # -------------------------------------------------------
+  # 基础 DNS
+  #
+  # 这里必须使用纯 IP DNS
+  # -------------------------------------------------------
+
   default-nameserver:
-    - 1.1.1.1
-    - 8.8.8.8
+    - 223.5.5.5
+    - 119.29.29.29
+
+
+  # -------------------------------------------------------
+  # 主 DNS
+  #
+  # 阿里 DNS + 腾讯 DNSPod
+  # -------------------------------------------------------
 
   nameserver:
-    - https://cloudflare-dns.com/dns-query
-    - https://dns.google/dns-query
-
-  proxy-server-nameserver:
     - https://dns.alidns.com/dns-query
     - https://doh.pub/dns-query
 
-  fake-ip-filter:
-    - "*.lan"
-    - "+.local"
-    - "localhost"
-    - "+.msftconnecttest.com"
-    - "+.msftncsi.com"
-    - "captive.apple.com"
+
+  # -------------------------------------------------------
+  # 节点服务器域名解析
+  #
+  # 用于：
+  # *.ednovas.life
+  # *.nmsl.sb
+  # *.ednovas.cloud
+  #
+  # 防止解析代理节点本身时形成 DNS 问题
+  # -------------------------------------------------------
+
+  proxy-server-nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
 
 
 # =========================================================
 # 5. 回国节点
-#
-# 从原机场配置中提取：
-# 绍兴 / 北京 / 上海 / 深圳
-#
-# 每个地区：
-# 1. 直连
-# 2. 南亚中转
-# 3. 东亚中转
-# 4. 香港中转
 # =========================================================
 
 proxies:
+
 
   # =======================================================
   # 绍兴
@@ -147,6 +185,7 @@ proxies:
     cipher: auto
     udp: true
 
+
   - name: "🇨🇳 绍兴-南亚中转"
     type: vmess
     server: sg.nmsl.sb
@@ -155,6 +194,7 @@ proxies:
     alterId: 0
     cipher: auto
     udp: true
+
 
   - name: "🇨🇳 绍兴-东亚中转"
     type: vmess
@@ -165,6 +205,7 @@ proxies:
     cipher: auto
     udp: true
 
+
   - name: "🇨🇳 绍兴-香港中转"
     type: vmess
     server: bbc.ednovas.cloud
@@ -173,6 +214,7 @@ proxies:
     alterId: 0
     cipher: auto
     udp: true
+
 
 
   # =======================================================
@@ -188,6 +230,7 @@ proxies:
     cipher: auto
     udp: true
 
+
   - name: "🇨🇳 北京-南亚中转"
     type: vmess
     server: sg.nmsl.sb
@@ -196,6 +239,7 @@ proxies:
     alterId: 0
     cipher: auto
     udp: true
+
 
   - name: "🇨🇳 北京-东亚中转"
     type: vmess
@@ -206,6 +250,7 @@ proxies:
     cipher: auto
     udp: true
 
+
   - name: "🇨🇳 北京-香港中转"
     type: vmess
     server: bbc.ednovas.cloud
@@ -214,6 +259,7 @@ proxies:
     alterId: 0
     cipher: auto
     udp: true
+
 
 
   # =======================================================
@@ -229,6 +275,7 @@ proxies:
     cipher: auto
     udp: true
 
+
   - name: "🇨🇳 上海-南亚中转"
     type: vmess
     server: sg.nmsl.sb
@@ -237,6 +284,7 @@ proxies:
     alterId: 0
     cipher: auto
     udp: true
+
 
   - name: "🇨🇳 上海-东亚中转"
     type: vmess
@@ -247,6 +295,7 @@ proxies:
     cipher: auto
     udp: true
 
+
   - name: "🇨🇳 上海-香港中转"
     type: vmess
     server: bbc.ednovas.cloud
@@ -255,6 +304,7 @@ proxies:
     alterId: 0
     cipher: auto
     udp: true
+
 
 
   # =======================================================
@@ -270,6 +320,7 @@ proxies:
     cipher: auto
     udp: true
 
+
   - name: "🇨🇳 深圳-南亚中转"
     type: vmess
     server: sg.nmsl.sb
@@ -279,6 +330,7 @@ proxies:
     cipher: auto
     udp: true
 
+
   - name: "🇨🇳 深圳-东亚中转"
     type: vmess
     server: jp.nmsl.sb
@@ -287,6 +339,7 @@ proxies:
     alterId: 0
     cipher: auto
     udp: true
+
 
   - name: "🇨🇳 深圳-香港中转"
     type: vmess
@@ -298,25 +351,21 @@ proxies:
     udp: true
 
 
+
 # =========================================================
 # 6. 策略组
 # =========================================================
 
 proxy-groups:
 
+
   # =======================================================
   # 主回国策略
-  #
-  # 平时直接在 Clash Verge 中选择这里。
-  #
-  # 默认：
-  # ⚡ 回国自动选择
-  #
-  # 也可以手动选择深圳 / 上海 / 北京 / 绍兴。
   # =======================================================
 
   - name: "🇨🇳 回国节点"
     type: select
+
     proxies:
       - "⚡ 回国自动选择"
       - "🛟 回国故障转移"
@@ -342,11 +391,15 @@ proxy-groups:
       - "🇨🇳 北京"
 
 
+
   # =======================================================
   # 自动测速
   #
-  # 每 5 分钟测速一次。
-  # tolerance 50 = 延迟差距不足 50ms 时不频繁切换。
+  # 注意：
+  # Google generate_204 用于判断线路是否真正可以访问国际网络。
+  #
+  # 如果你的国内节点本身限制 Google，
+  # 后面可以换成国内测速地址。
   # =======================================================
 
   - name: "⚡ 回国自动选择"
@@ -374,15 +427,15 @@ proxy-groups:
       - "🇨🇳 北京"
 
     url: "http://www.gstatic.com/generate_204"
+
     interval: 300
     tolerance: 50
     lazy: true
 
 
+
   # =======================================================
   # 故障转移
-  #
-  # 当前节点不可用时自动切换。
   # =======================================================
 
   - name: "🛟 回国故障转移"
@@ -391,28 +444,62 @@ proxy-groups:
     proxies:
       - "🇨🇳 深圳-香港中转"
       - "🇨🇳 深圳-南亚中转"
+      - "🇨🇳 深圳-东亚中转"
       - "🇨🇳 深圳"
+
       - "🇨🇳 上海-香港中转"
       - "🇨🇳 上海-南亚中转"
+      - "🇨🇳 上海-东亚中转"
       - "🇨🇳 上海"
+
       - "🇨🇳 绍兴-香港中转"
+      - "🇨🇳 绍兴-南亚中转"
+      - "🇨🇳 绍兴-东亚中转"
       - "🇨🇳 绍兴"
+
       - "🇨🇳 北京-香港中转"
+      - "🇨🇳 北京-南亚中转"
+      - "🇨🇳 北京-东亚中转"
       - "🇨🇳 北京"
 
     url: "http://www.gstatic.com/generate_204"
+
     interval: 300
     lazy: true
 
 
+
 # =========================================================
 # 7. 路由规则
+#
+# 注意：
+#
+# 【规则模式 Rule】
+#
+# 只有：
+# 160.202.240.122:3333
+#
+# 走中国。
+#
+# 其他全部 DIRECT。
+#
+#
+# 【全局模式 Global】
+#
+# 规则不会决定最终出口，
+# Clash Verge 的 GLOBAL 选择器决定出口。
+#
+# 如果 GLOBAL 选择：
+# 🇨🇳 深圳-香港中转
+#
+# 那整个电脑都会走深圳回国节点。
 # =========================================================
 
 rules:
 
+
   # =======================================================
-  # 局域网直连
+  # 局域网
   # =======================================================
 
   - GEOSITE,private,DIRECT
@@ -420,44 +507,22 @@ rules:
 
 
   # =======================================================
-  # 唯一需要翻回中国的地址
-  #
-  # 原地址：
+  # 指定后台
   #
   # http://160.202.240.122:3333/#/login
   #
-  # Clash 实际只需要识别：
+  # Hash：
+  # #/login
   #
-  # IP：
-  # 160.202.240.122
-  #
-  # 端口：
-  # 3333
-  #
-  # #/login 属于浏览器 Hash Router，
-  # 不参与网络路由匹配。
+  # 不属于网络请求的一部分，
+  # Clash 不需要匹配。
   # =======================================================
 
   - AND,((IP-CIDR,160.202.240.122/32),(DST-PORT,3333)),🇨🇳 回国节点
 
 
   # =======================================================
-  # 最终兜底
-  #
-  # 除上述 IP:3333 外：
-  #
-  # Google
-  # ChatGPT
-  # YouTube
-  # Facebook
-  # Zalo
-  # Microsoft
-  # Apple
-  # 越南网站
-  # 中国网站
-  # 国际网站
-  #
-  # 全部使用越南本地网络。
+  # 其他全部直连
   # =======================================================
 
   - MATCH,DIRECT
